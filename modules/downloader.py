@@ -112,7 +112,12 @@ PUBLIC_TRACKERS = [
 TRACKER_CSV = ",".join(PUBLIC_TRACKERS)
 
 
-_ARIA2_STATIC_BASE = "https://github.com/q3aql/aria2-static-builds/releases/download/v1.37.0"
+_ARIA2_STATIC_BASES = [
+    "https://github.com/dmesg00/aria2-static-builds/releases/download/v1.37.0",
+    "https://github.com/xrgzs/aria2-static-builds/releases/download/v1.37.0",
+    "https://github.com/snowylly/aria2-static-builds/releases/download/v1.37.0",
+    "https://github.com/q3aql/aria2-static-builds/releases/download/v1.37.0",
+]
 _ARIA2_STATIC_MAP = {
     "amd64": "aria2-1.37.0-linux-gnu-64bit-build1.tar.bz2",
     "x86_64": "aria2-1.37.0-linux-gnu-64bit-build1.tar.bz2",
@@ -142,24 +147,36 @@ def _download_windows_aria2(dest: Path) -> None:
 
 
 def _download_linux_aria2(dest: Path) -> None:
-    """Download a static aria2c build for the current Linux arch into `dest`."""
+    """Download a static aria2c build for the current Linux arch into `dest`.
+
+    Tries each known mirror (some repos get archived/404) and only raises once
+    every mirror has failed.
+    """
     arch = platform.machine().lower() or "amd64"
     asset = _ARIA2_STATIC_MAP.get(arch) or _ARIA2_STATIC_MAP["amd64"]
-    url = f"{_ARIA2_STATIC_BASE}/{asset}"
-    tarball = dest.with_suffix(".tar.bz2")
-    try:
-        resp = req.get(url, timeout=60)
-        resp.raise_for_status()
-        tarball.write_bytes(resp.content)
-        with tarfile.open(str(tarball), "r:*") as tar:
-            for member in tar.getmembers():
-                if member.isreg() and os.path.basename(member.name) == "aria2c":
-                    with tar.extractfile(member) as src, open(dest, "wb") as f:
-                        f.write(src.read())
-                    break
-        dest.chmod(0o755)
-    finally:
-        tarball.unlink(missing_ok=True)
+    last_err: Exception | None = None
+    for base in _ARIA2_STATIC_BASES:
+        url = f"{base}/{asset}"
+        tarball = dest.with_suffix(".tar.bz2")
+        try:
+            resp = req.get(url, timeout=60)
+            resp.raise_for_status()
+            tarball.write_bytes(resp.content)
+            with tarfile.open(str(tarball), "r:*") as tar:
+                for member in tar.getmembers():
+                    if member.isreg() and os.path.basename(member.name) == "aria2c":
+                        with tar.extractfile(member) as src, open(dest, "wb") as f:
+                            f.write(src.read())
+                        break
+            dest.chmod(0o755)
+            if dest.exists():
+                return
+        except Exception as e:
+            last_err = e
+            print(f"[aria2] mirror {base} failed, trying next: {e}", flush=True)
+        finally:
+            tarball.unlink(missing_ok=True)
+    raise RuntimeError(f"All aria2 mirror downloads failed: {last_err}")
 
 
 def ensure_aria2_engine() -> str:
@@ -1023,4 +1040,3 @@ class DownloadManager:
 
     def get_all_tasks(self) -> dict:
         return self.tasks
-

@@ -6,6 +6,7 @@ import tarfile
 import subprocess
 import json
 import time
+import tempfile
 import platform
 import requests as req
 from pathlib import Path
@@ -187,29 +188,37 @@ def ensure_aria2_engine() -> str:
     if found:
         return found
 
-    # 2) Reuse a portable binary cached next to this module (CWD-safe and
-    #    survives worker restarts).
-    dest_dir = Path(__file__).resolve().parent / "bin"
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / exe_name
-    if dest.exists():
-        return str(dest)
+    # 2) Portable binary cache locations. The project dir may be read-only on
+    #    Render (ephemeral/build disk), so we also allow the OS temp dir.
+    candidates = [
+        Path(__file__).resolve().parent / "bin" / exe_name,
+        Path(tempfile.gettempdir()) / "showcatch-aria2" / exe_name,
+    ]
+    for dest in candidates:
+        try:
+            if dest.exists():
+                return str(dest)
+        except Exception:
+            continue
 
-    # 3) Bootstrap a portable/static binary for the current OS. This NEVER
-    #    raises: on failure we fall back to the bare command name so startup
-    #    cannot crash — the RPC server start is guarded separately and will
-    #    surface a friendly per-download error instead.
-    try:
-        if platform.system() == "Windows":
-            _download_windows_aria2(dest)
-        else:
-            _download_linux_aria2(dest)
-        if dest.exists():
-            print(f"[aria2] portable engine ready: {dest}", flush=True)
-            return str(dest)
-    except Exception as e:
-        print(f"[aria2] engine bootstrap failed, fallback to '{exe_name}': {e}", flush=True)
+    # 3) Bootstrap a portable/static binary. Every filesystem op is guarded so
+    #    startup can NEVER crash (no mkdir/write outside try/except) — on
+    #    failure we fall back to the bare command name; the RPC server start is
+    #    guarded separately and surfaces a friendly per-download error instead.
+    for dest in candidates:
+        try:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if platform.system() == "Windows":
+                _download_windows_aria2(dest)
+            else:
+                _download_linux_aria2(dest)
+            if dest.exists():
+                print(f"[aria2] portable engine ready: {dest}", flush=True)
+                return str(dest)
+        except Exception as e:
+            print(f"[aria2] engine bootstrap failed at {dest.parent}, trying next: {e}", flush=True)
 
+    print(f"[aria2] no engine available, fallback to '{exe_name}'", flush=True)
     return exe_name
 
 
@@ -516,11 +525,17 @@ class DownloadManager:
         import subprocess as _sp
         try:
             if platform.system() == "Windows":
+                if not shutil.which("taskkill"):
+                    print("[aria2] taskkill not found, skipping stale cleanup", flush=True)
+                    return
                 out = _sp.run(
                     ["taskkill", "/F", "/IM", "aria2c.exe", "/T"],
                     capture_output=True, text=True,
                 )
             else:
+                if not shutil.which("pkill"):
+                    print("[aria2] pkill not found, skipping stale cleanup", flush=True)
+                    return
                 out = _sp.run(
                     ["pkill", "-f", "aria2c"],
                     capture_output=True, text=True,

@@ -37,8 +37,9 @@ async def startup_cleanup():
     clean_history()
 
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+_APP_DIR = Path(__file__).resolve().parent
+app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(_APP_DIR / "templates"))
 
 resolver = IMDbResolver()
 indexer = CustomIndexer()

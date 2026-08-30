@@ -1,0 +1,24 @@
+[
+  {
+    "title": "Train to Busan",
+    "year": "2016",
+    "imdb_id": "tt5700672",
+    "poster_url": "https://m.media-amazon.com/images/M/MV5BODA3OTM4NWQtMjU1OS00NzA2LTlhZDAtYjU2YjM5MWUxNTdiXkEyXkFqcGc@._V1_.jpg",
+    "media_type": "movie",
+    "searched_at": "2026-08-21T13:14:27.213547+00:00",
+    "last_searched": "2026-08-21T13:14:27.213574+00:00",
+    "search_count": 1,
+    "downloaded": false
+  },
+  {
+    "title": "Interstellar",
+    "year": "2014",
+    "imdb_id": "tt0816692",
+    "poster_url": "https://m.media-amazon.com/images/M/MV5BYzdjMDAxZGItMjI2My00ODA1LTlkNzItOWFjMDU5ZDJlYWY3XkEyXkFqcGc@._V1_.jpg",
+    "media_type": "movie",
+    "searched_at": "2026-08-21T13:07:04.885301+00:00",
+    "last_searched": "2026-08-21T13:07:04.885317+00:00",
+    "search_count": 1,
+    "downloaded": false
+  }
+]

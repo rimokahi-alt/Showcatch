@@ -2,6 +2,7 @@ import os
 import re
 import shutil
 import zipfile
+import tarfile
 import subprocess
 import json
 import time
@@ -111,43 +112,88 @@ PUBLIC_TRACKERS = [
 TRACKER_CSV = ",".join(PUBLIC_TRACKERS)
 
 
-def ensure_aria2_engine() -> str:
-    # Cross-platform (Windows + Linux/Render): pick the right executable name,
-    # and on Linux rely on the system-installed `aria2c` available in PATH.
-    is_windows = platform.system() == "Windows"
-    exe_name = "aria2c.exe" if is_windows else "aria2c"
+_ARIA2_STATIC_BASE = "https://github.com/q3aql/aria2-static-builds/releases/download/v1.37.0"
+_ARIA2_STATIC_MAP = {
+    "amd64": "aria2-1.37.0-linux-gnu-64bit-build1.tar.bz2",
+    "x86_64": "aria2-1.37.0-linux-gnu-64bit-build1.tar.bz2",
+    "aarch64": "aria2-1.37.0-linux-gnu-arm-rbpi-build1.tar.bz2",
+    "arm64": "aria2-1.37.0-linux-gnu-arm-rbpi-build1.tar.bz2",
+    "armv7l": "aria2-1.37.0-linux-gnu-arm-rbpi-build1.tar.bz2",
+    "armv6l": "aria2-1.37.0-linux-gnu-arm-rbpi-build1.tar.bz2",
+}
 
-    # Resolve via PATH first (works on Linux and if aria2c.exe is on PATH on Windows).
+
+def _download_windows_aria2(dest: Path) -> None:
+    """Download the official Windows aria2c.exe into `dest`."""
+    url = "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip"
+    zip_path = dest.with_suffix(".zip")
+    try:
+        resp = req.get(url, timeout=60)
+        resp.raise_for_status()
+        zip_path.write_bytes(resp.content)
+        with zipfile.ZipFile(zip_path) as z:
+            for member in z.namelist():
+                if member.endswith("aria2c.exe"):
+                    with z.open(member) as src, open(dest, "wb") as f:
+                        f.write(src.read())
+                    break
+    finally:
+        zip_path.unlink(missing_ok=True)
+
+
+def _download_linux_aria2(dest: Path) -> None:
+    """Download a static aria2c build for the current Linux arch into `dest`."""
+    arch = platform.machine().lower() or "amd64"
+    asset = _ARIA2_STATIC_MAP.get(arch) or _ARIA2_STATIC_MAP["amd64"]
+    url = f"{_ARIA2_STATIC_BASE}/{asset}"
+    tarball = dest.with_suffix(".tar.bz2")
+    try:
+        resp = req.get(url, timeout=60)
+        resp.raise_for_status()
+        tarball.write_bytes(resp.content)
+        with tarfile.open(str(tarball), "r:*") as tar:
+            for member in tar.getmembers():
+                if member.isreg() and os.path.basename(member.name) == "aria2c":
+                    with tar.extractfile(member) as src, open(dest, "wb") as f:
+                        f.write(src.read())
+                    break
+        dest.chmod(0o755)
+    finally:
+        tarball.unlink(missing_ok=True)
+
+
+def ensure_aria2_engine() -> str:
+    # 1) Respect a system install first (apt-get aria2 on Linux/Render, or
+    #    aria2c.exe on PATH on Windows).
+    exe_name = "aria2c.exe" if platform.system() == "Windows" else "aria2c"
     found = shutil.which(exe_name)
     if found:
         return found
 
-    exe = Path(exe_name)
-    if exe.exists():
-        return str(exe)
+    # 2) Reuse a portable binary cached next to this module (CWD-safe and
+    #    survives worker restarts).
+    dest_dir = Path(__file__).resolve().parent / "bin"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / exe_name
+    if dest.exists():
+        return str(dest)
 
-    # Windows only: download the bundled Windows binary.
-    if not is_windows:
-        raise RuntimeError("aria2c not found on PATH. Please install aria2 on the server (e.g. `apt-get install aria2`)")
-
-    url = "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip"
-    zip_path = Path("aria2_temp.zip")
+    # 3) Bootstrap a portable/static binary for the current OS. This NEVER
+    #    raises: on failure we fall back to the bare command name so startup
+    #    cannot crash — the RPC server start is guarded separately and will
+    #    surface a friendly per-download error instead.
     try:
-        resp = req.get(url, timeout=30)
-        resp.raise_for_status()
-        with open(zip_path, "wb") as f:
-            f.write(resp.content)
-        with zipfile.ZipFile(zip_path) as z:
-            for member in z.namelist():
-                if member.endswith("aria2c.exe"):
-                    with z.open(member) as src, open(exe, "wb") as dst:
-                        dst.write(src.read())
-                    break
-        zip_path.unlink(missing_ok=True)
-        return str(exe)
+        if platform.system() == "Windows":
+            _download_windows_aria2(dest)
+        else:
+            _download_linux_aria2(dest)
+        if dest.exists():
+            print(f"[aria2] portable engine ready: {dest}", flush=True)
+            return str(dest)
     except Exception as e:
-        zip_path.unlink(missing_ok=True)
-        raise RuntimeError(f"Failed to setup aria2: {e}")
+        print(f"[aria2] engine bootstrap failed, fallback to '{exe_name}': {e}", flush=True)
+
+    return exe_name
 
 
 def check_disk_space(target_dir: Path, estimated_size_str: str) -> dict:
@@ -977,3 +1023,4 @@ class DownloadManager:
 
     def get_all_tasks(self) -> dict:
         return self.tasks
+

@@ -5,6 +5,7 @@ import zipfile
 import subprocess
 import json
 import time
+import platform
 import requests as req
 from pathlib import Path
 from uuid import uuid4
@@ -111,9 +112,24 @@ TRACKER_CSV = ",".join(PUBLIC_TRACKERS)
 
 
 def ensure_aria2_engine() -> str:
-    exe = Path("aria2c.exe")
+    # Cross-platform (Windows + Linux/Render): pick the right executable name,
+    # and on Linux rely on the system-installed `aria2c` available in PATH.
+    is_windows = platform.system() == "Windows"
+    exe_name = "aria2c.exe" if is_windows else "aria2c"
+
+    # Resolve via PATH first (works on Linux and if aria2c.exe is on PATH on Windows).
+    found = shutil.which(exe_name)
+    if found:
+        return found
+
+    exe = Path(exe_name)
     if exe.exists():
         return str(exe)
+
+    # Windows only: download the bundled Windows binary.
+    if not is_windows:
+        raise RuntimeError("aria2c not found on PATH. Please install aria2 on the server (e.g. `apt-get install aria2`)")
+
     url = "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip"
     zip_path = Path("aria2_temp.zip")
     try:
@@ -436,10 +452,16 @@ class DownloadManager:
         were caused by piled-up orphaned aria2 processes fighting over the ports."""
         import subprocess as _sp
         try:
-            out = _sp.run(
-                ["taskkill", "/F", "/IM", "aria2c.exe", "/T"],
-                capture_output=True, text=True,
-            )
+            if platform.system() == "Windows":
+                out = _sp.run(
+                    ["taskkill", "/F", "/IM", "aria2c.exe", "/T"],
+                    capture_output=True, text=True,
+                )
+            else:
+                out = _sp.run(
+                    ["pkill", "-f", "aria2c"],
+                    capture_output=True, text=True,
+                )
             print(f"[aria2] cleared stale processes: {out.stdout.strip()[:120]}", flush=True)
         except Exception as e:
             print(f"[aria2] stale cleanup error: {e}", flush=True)

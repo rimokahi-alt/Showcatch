@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShowCatch</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=57">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-left">
+            <button class="nav-btn home-btn" id="homeBtn" title="Home">&#127968;</button>
+            <div class="logo">
+                <span class="logo-icon">&#127916;</span>
+                <span class="logo-text" data-i18n="app_title">ShowCatch</span>
+            </div>
+        </div>
+        <div class="nav-right">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-section="search" data-i18n="search_section">Search</button>
+                <button class="nav-tab" data-section="library" data-i18n="library">Library</button>
+            </div>
+            <select class="lang-select" id="langSelect">
+                <option value="en">EN</option>
+                <option value="fr">FR</option>
+                <option value="ar">AR</option>
+            </select>
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme">&#9788;</button>
+            <button class="nav-btn storage-nav-btn" id="storageToggle" title="Toggle storage">&#128190;</button>
+            <div class="auth-area" id="authArea">
+                <button class="nav-btn" id="loginBtn" data-i18n="login">Login</button>
+                <div class="user-menu hidden" id="userMenu">
+                    <span class="username-display" id="usernameDisplay"></span>
+                    <button class="nav-btn" id="logoutBtn" data-i18n="logout">Logout</button>
+                </div>
+            </div>
+            <button class="nav-btn" id="settingsBtn" title="Settings">&#9881;</button>
+        </div>
+    </nav>
+
+    <main class="container">
+
+        <!-- Hero Banner -->
+        <div class="hero hidden" id="heroBanner">
+            <div class="hero-backdrop" id="heroBackdrop"></div>
+            <div class="hero-gradient"></div>
+            <button class="hero-nav" id="heroPrev" title="Previous">&#10094;</button>
+            <button class="hero-nav hero-nav-next" id="heroNext" title="Next">&#10095;</button>
+            <div class="hero-content">
+                <span class="hero-badge" id="heroBadge">Movie</span>
+                <h1 class="hero-title" id="heroTitle"></h1>
+                <p class="hero-meta" id="heroMeta"></p>
+                <p class="hero-desc" id="heroDesc"></p>
+                <div class="hero-actions">
+                    <button class="btn-hero-play" id="heroPlayBtn">&#9654; <span data-i18n="play">Play</span></button>
+                    <button class="btn-hero-play btn-hero-download hidden" id="heroDownloadBtn">&#11015; <span data-i18n="download">Download</span></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <section class="page-section active" id="searchPage">
+            <div class="search-section">
+                <div class="media-type-toggle">
+                    <button class="type-btn active" data-type="movie" data-i18n="type_movie">Movie</button>
+                    <button class="type-btn" data-type="tv" data-i18n="type_tv">TV Show</button>
+                </div>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Enter movie or show title..." data-i18n-placeholder="search_placeholder" autofocus>
+                    <button id="searchClearBtn" class="search-clear hidden" title="Clear search" aria-label="Clear search">&#10005;</button>
+                    <button id="searchBtn" data-i18n="search_btn">Search</button>
+                </div>
+                <p class="search-hint" data-i18n="search_hint">Example: "Air", "Oppenheimer", "Breaking Bad"</p>
+            </div>
+
+            <div class="tv-selectors hidden" id="tvSelectors">
+                <div class="selector-row">
+                    <label data-i18n="select_season">Season:</label>
+                    <select id="seasonSelect"><option value="0">--</option></select>
+                    <label data-i18n="select_episode">Episode:</label>
+                    <select id="episodeSelect"><option value="0">--</option></select>
+                    <button class="btn-batch hidden" id="batchDownloadBtn" data-i18n="download_season">Download Season</button>
+                </div>
+                <div class="batch-status hidden" id="batchStatus">
+                    <span class="batch-progress-text" id="batchProgressText"></span>
+                    <div class="progress-bar"><div class="progress-fill" id="batchProgressFill"></div></div>
+                </div>
+            </div>
+
+            <div class="loading hidden" id="loading">
+                <div class="spinner"></div>
+                <p data-i18n="searching">Searching releases...</p>
+            </div>
+
+            <div class="error-box hidden" id="errorBox">
+                <span class="error-icon">&#9888;</span>
+                <span class="error-text" id="errorText"></span>
+            </div>
+
+            <section class="movie-info hidden" id="movieInfo">
+                <div class="movie-card">
+                    <img class="movie-poster" id="moviePoster" src="" alt="Poster">
+                    <div class="movie-details">
+                        <h2 id="movieTitle"></h2>
+                        <p id="movieMeta"></p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="releases-section hidden" id="releasesSection">
+                <div class="table-header">
+                    <h3 data-i18n="releases">Available Releases</h3>
+                    <span class="release-count" id="releaseCount"></span>
+                    <button id="resultsCloseBtn" class="results-close hidden" title="Close results" aria-label="Close results">&#10005; <span data-i18n="close">Close</span></button>
+                </div>
+                <div class="table-wrapper">
+                    <table class="releases-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th data-i18n="title">Title</th>
+                                <th data-i18n="size">Size</th>
+                                <th data-i18n="seeds">Seeds</th>
+                                <th data-i18n="source">Source</th>
+                                <th data-i18n="action">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="releasesBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <div class="empty-search-pad"></div>
+        </section>
+
+        <!-- Library Section -->
+        <section class="page-section" id="libraryPage">
+            <div class="library-header">
+                <h2 data-i18n="library">Library</h2>
+            </div>
+
+            <!-- Storage indicator -->
+            <div class="storage-card hidden" id="storageCard">
+                <div class="storage-head">
+                    <span class="storage-title">&#128190; <span data-i18n="storage">Storage</span></span>
+                    <span class="storage-count" id="storageCount">0 / 0 GB</span>
+                </div>
+                <div class="storage-bar"><div class="storage-fill" id="storageFill"></div></div>
+                <div class="storage-sub">
+                    <span id="storageFree"></span>
+                    <span id="storagePercent"></span>
+                </div>
+            </div>
+
+            <!-- Filter pills -->
+            <div class="filter-pills" id="filterPills">
+                <button class="pill active" data-filter="all" data-i18n="all">All</button>
+                <button class="pill" data-filter="movies" data-i18n="movies">Movies</button>
+                <button class="pill" data-filter="series" data-i18n="series">Series</button>
+                <span class="pill-spacer"></span>
+                <input type="text" class="pill-search" id="librarySearch" placeholder="&#128269; Filter library..." data-i18n-placeholder="filter_placeholder">
+            </div>
+            <div class="filter-pills genre-filter hidden" id="genrePills"></div>
+
+            <div class="library-subsection">
+                <h3>&#127916; <span data-i18n="downloaded_movies">Movies</span></h3>
+                <div class="library-grid" id="downloadedList">
+                    <p class="empty-state" data-i18n="no_downloaded">No downloaded movies yet</p>
+                </div>
+            </div>
+
+            <div class="library-subsection">
+                <h3>&#128250; <span data-i18n="downloaded_series">Series</span></h3>
+                <div class="library-grid" id="seriesList">
+                    <p class="empty-state">No downloaded series yet</p>
+                </div>
+            </div>
+
+            <div class="series-detail hidden" id="seriesDetail">
+                <button class="back-btn-inline" id="seriesBackBtn">&#8592; Back to Library</button>
+                <div class="series-header" id="seriesHeader"></div>
+                <div class="season-tabs" id="seasonTabs"></div>
+                <div class="episode-list" id="episodeList"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Video Player Modal -->
+    <div class="player-modal hidden" id="playerModal">
+        <div class="player-modal-overlay" id="playerOverlay"></div>
+        <div class="player-modal-content">
+            <div class="player-modal-header">
+                <span class="player-modal-title" id="playerTitle"></span>
+                <button class="player-modal-close" id="playerClose">&times;</button>
+            </div>
+            <div class="player-modal-body">
+                <video id="videoPlayer" controls autoplay preload="auto"></video>
+            </div>
+            <div class="player-modal-info" id="playerInfo"></div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal hidden" id="settingsModal">
+        <div class="modal-overlay" id="modalOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 data-i18n="settings">Settings</h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="destInput" data-i18n="dest_folder">Download Destination Folder</label>
+                <input type="text" id="destInput" placeholder="D:\Movies">
+                <p class="hint" id="currentDest"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="modalCancel" data-i18n="cancel">Cancel</button>
+                <button class="btn-primary" id="modalSave" data-i18n="save">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="modal hidden" id="authModal">
+        <div class="modal-overlay" id="authOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="authModalTitle">Login</h3>
+                <button class="modal-close" id="authClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="error-box hidden" id="authError">
+                    <span class="error-text" id="authErrorText"></span>
+                </div>
+                <label for="authUsername" data-i18n="username">Username</label>
+                <input type="text" id="authUsername" placeholder="Username" autocomplete="username">
+                <label for="authPassword" data-i18n="password">Password</label>
+                <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
+            </div>
+            <div class="modal-footer">
+                <p class="auth-switch" id="authSwitch"></p>
+                <button class="btn-primary" id="authSubmit">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Floating Downloads Panel -->
+    <div class="float-downloads hidden" id="floatDownloads">
+        <div class="float-downloads-header" id="floatDownloadsHeader">
+            <span class="float-downloads-title"><span data-i18n="active_downloads">Active Downloads</span></span>
+            <span class="float-downloads-toggle" id="floatDownloadsToggle" title="Collapse">&#9660;</span>
+        </div>
+        <div class="float-downloads-body" id="floatDownloadsBody">
+            <div class="downloads-list" id="downloadsList">
+                <p class="empty-state" data-i18n="no_downloads">No active downloads</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=57"></script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000; color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: 100vh;
+        }
+        .player-container { width: 100%; max-width: 1100px; padding: 1rem; }
+        .back-btn {
+            display: inline-block; padding: 0.5rem 1rem;
+            background: rgba(255,255,255,0.1); color: #fff;
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+            cursor: pointer; text-decoration: none; font-size: 0.9rem;
+            margin-bottom: 1rem; transition: background 0.2s;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.2); }
+        video { width: 100%; border-radius: 8px; background: #111; max-height: 80vh; }
+        .title-bar { padding: 0.8rem 0; font-size: 1.1rem; color: #ccc; }
+        .file-info { font-size: 0.8rem; color: #666; margin-bottom: 1rem; }
+        .transcoding-badge {
+            display: inline-block; padding: 0.3rem 0.8rem;
+            background: rgba(0,212,255,0.15); color: #00d4ff;
+            border: 1px solid rgba(0,212,255,0.3); border-radius: 20px;
+            font-size: 0.75rem; margin-left: 0.5rem; vertical-align: middle;
+        }
+        .multifile-list { margin-top: 1rem; }
+        .multifile-list h4 { color: #888; margin-bottom: 0.5rem; font-size: 0.85rem; }
+        .multifile-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.5rem 0.8rem; background: rgba(255,255,255,0.05);
+            border-radius: 6px; margin-bottom: 0.3rem; font-size: 0.82rem;
+        }
+        .multifile-item span { color: #ccc; }
+        .multifile-item button {
+            background: #00d4ff; color: #000; border: none; border-radius: 4px;
+            padding: 0.25rem 0.8rem; cursor: pointer; font-size: 0.78rem; font-weight: 600;
+        }
+        .multifile-item button:hover { background: #00b8e6; }
+    </style>
+</head>
+<body>
+    <div class="player-container">
+        <a class="back-btn" href="/">&#8592; Back to Library</a>
+        <div class="title-bar" id="titleBar"></div>
+        <div class="file-info" id="fileInfo"></div>
+        <video id="videoPlayer" controls autoplay>
+            Your browser does not support the video tag.
+        </video>
+        <div id="multiFileSection" class="multifile-list" style="display:none"></div>
+    </div>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const filePath = params.get("path") || "";
+        const title = params.get("title") || "";
+        const allVideos = params.get("videos") || "";
+
+        const PLAYABLE = ["mp4", "webm", "ogg"];
+        const TRANSCODE = ["mkv", "avi", "mov", "flv", "wmv", "ts", "m2ts", "vob"];
+
+        document.getElementById("titleBar").textContent = decodeURIComponent(title);
+        document.title = title ? decodeURIComponent(title) + " - Player" : "Player";
+
+        function playPath(path, titleText) {
+            const video = document.getElementById("videoPlayer");
+            const ext = path.split(".").pop().split("?")[0].toLowerCase();
+            const titleEl = document.getElementById("titleBar");
+            if (titleText) titleEl.textContent = titleText;
+
+            if (PLAYABLE.includes(ext)) {
+                video.src = "/api/stream?path=" + encodeURIComponent(path);
+            } else if (TRANSCODE.includes(ext)) {
+                video.src = "/api/transcode?path=" + encodeURIComponent(path);
+                const badge = document.createElement("span");
+                badge.className = "transcoding-badge";
+                badge.textContent = "Transcoding";
+                titleEl.appendChild(badge);
+            } else {
+                video.style.display = "none";
+                const err = document.createElement("div");
+                err.style.cssText = "background:rgba(255,82,82,0.1);border:1px solid #ff5252;border-radius:10px;padding:1.5rem;text-align:center;margin-top:1rem;";
+                err.innerHTML = '<h3 style="color:#ff5252;margin-bottom:0.5rem;">Unsupported format</h3>' +
+                    '<p style="color:#aaa;font-size:0.9rem;margin-bottom:1rem;">.' + ext.toUpperCase() + ' cannot be played.</p>' +
+                    '<a href="/api/stream?path=' + encodeURIComponent(path) + '" download style="display:inline-block;padding:0.6rem 1.5rem;background:#00d4ff;color:#000;border:none;border-radius:8px;font-size:0.95rem;font-weight:600;text-decoration:none;">Download</a>';
+                document.querySelector(".player-container").appendChild(err);
+                return;
+            }
+        }
+
+        if (filePath) {
+            playPath(filePath, decodeURIComponent(title));
+        }
+
+        if (allVideos) {
+            try {
+                const videos = JSON.parse(decodeURIComponent(allVideos));
+                if (videos.length > 1) {
+                    const section = document.getElementById("multiFileSection");
+                    section.style.display = "block";
+                    section.innerHTML = '<h4>All files in this folder:</h4>';
+                    videos.forEach(v => {
+                        const item = document.createElement("div");
+                        item.className = "multifile-item";
+                        const ext2 = v.name.split(".").pop().toLowerCase();
+                        const tag = TRANSCODE.includes(ext2) ? " [transcoded]" : "";
+                        item.innerHTML = '<span>' + v.name + ' (' + v.size + ')' + tag + '</span>';
+                        const btn = document.createElement("button");
+                        btn.textContent = "Play";
+                        btn.addEventListener("click", () => playPath(v.path, v.name));
+                        item.appendChild(btn);
+                        section.appendChild(item);
+                    });
+                }
+            } catch(e) {}
+        }
+    </script>
+</body>
+</html>

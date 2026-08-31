@@ -421,17 +421,18 @@ body {
 .downloads-list { display: flex; flex-direction: column; gap: 0.7rem; }
 .empty-state { text-align: center; color: var(--text-secondary); padding: 2rem; font-size: 0.9rem; }
 
-/* ===== Global Downloads Banner (top of screen) ===== */
+/* ===== Global Downloads Panel (bottom-right, Netflix-style toast) ===== */
 .float-downloads {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
+    bottom: 1rem;
+    right: 1rem;
+    width: 340px;
+    max-width: calc(100vw - 2rem);
     background: var(--bg-card);
-    border-bottom: 1px solid var(--border-strong);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
-    z-index: 90;
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+    z-index: 200;
     overflow: hidden;
     backdrop-filter: blur(12px);
 }
@@ -439,7 +440,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.55rem 1.2rem;
+    padding: 0.6rem 1rem;
     cursor: pointer;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border);
@@ -461,18 +462,15 @@ body {
 .float-downloads-body {
     max-height: 40vh;
     overflow-y: auto;
-    padding: 0.7rem;
+    padding: 0.6rem;
     transition: max-height 0.3s, padding 0.3s;
 }
 .float-downloads-body.collapsed {
     max-height: 0;
-    padding: 0 0.7rem;
+    padding: 0 0.6rem;
     border: none;
 }
 .float-downloads-body .downloads-list { padding-bottom: 0; }
-/* Offset page content so it is not hidden behind the fixed banner */
-body.has-downloads-banner { padding-top: 3.4rem; }
-body.has-downloads-banner.panel-collapsed { padding-top: 1.6rem; }
 
 /* ===== RTL panel ===== */
 [dir="rtl"] .float-downloads-header { flex-direction: row-reverse; }

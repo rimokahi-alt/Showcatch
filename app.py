@@ -463,6 +463,11 @@ async def get_featured():
         imdb = h.get("imdb_id", "")
         if not imdb or imdb in seen:
             continue
+        # A history entry marked as downloaded (by mark_downloaded) is already
+        # in the library banner — never re-surface it as a discovery duplicate.
+        if h.get("downloaded"):
+            seen.add(imdb)
+            continue
         seen.add(imdb)
         featured.append({
             "title": h.get("title", ""),
@@ -503,6 +508,10 @@ async def get_discover():
     for h in sorted(history, key=lambda x: (x.get("search_count", 0), x.get("last_searched", "")), reverse=True):
         imdb = h.get("imdb_id", "")
         if not imdb or imdb in seen:
+            continue
+        # Never re-surface a title that has already been downloaded.
+        if h.get("downloaded"):
+            seen.add(imdb)
             continue
         seen.add(imdb)
         discover.append({

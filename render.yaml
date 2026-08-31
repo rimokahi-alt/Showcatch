@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: showcatch
+    runtime: python
+    plan: free
+    autoDeploy: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    healthCheckPath: /

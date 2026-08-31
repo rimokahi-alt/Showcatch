@@ -41,6 +41,17 @@ _APP_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(_APP_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(_APP_DIR / "templates"))
 
+
+def _assets_version() -> str:
+    try:
+        times = [
+            (_APP_DIR / "static" / "css" / "style.css").stat().st_mtime,
+            (_APP_DIR / "static" / "js" / "app.js").stat().st_mtime,
+        ]
+        return str(int(max(times)))
+    except Exception:
+        return "1"
+
 resolver = IMDbResolver()
 indexer = CustomIndexer()
 download_manager = DownloadManager()
@@ -69,7 +80,7 @@ def _safe_path(raw_path: str):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     user = get_current_user(request)
-    return templates.TemplateResponse(request, "index.html", {"user": user})
+    return templates.TemplateResponse(request, "index.html", {"user": user, "assets_version": _assets_version()})
 
 
 @app.post("/api/register")

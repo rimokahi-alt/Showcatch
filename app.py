@@ -609,6 +609,10 @@ if __name__ == "__main__":
     import socket
     import uvicorn
 
+    # Render (and most PaaS) require listening on the $PORT env var;
+    # default to 8000 for local use.
+    port = int(os.environ.get("PORT", "8000"))
+
     # Anti-duplicate guard: refuse to start if another instance is already
     # listening on the server port, to avoid the process chaos that previously
     # made the app unreachable with repeated "Network error".
@@ -621,15 +625,15 @@ if __name__ == "__main__":
             return False
 
     ip = _get_lan_ip()
-    if _port_in_use("127.0.0.1", 8000):
-        print("\n[guard] Port 8000 is already in use - another instance appears to be running.")
+    if _port_in_use("127.0.0.1", port):
+        print(f"\n[guard] Port {port} is already in use - another instance appears to be running.")
         print("[guard] Refusing to start a duplicate server. Exiting.")
         print("[guard] If the running instance is stale/unreachable, stop it first, then retry.\n")
         raise SystemExit(0)
 
     print("\n" + "=" * 50)
     print(" ShowCatch server")
-    print(f"   On this PC:  http://localhost:8000")
-    print(f"   On phone:    http://{ip}:8000   (same Wi-Fi)")
+    print(f"   On this PC:  http://localhost:{port}")
+    print(f"   On phone:    http://{ip}:{port}   (same Wi-Fi)")
     print("=" * 50 + "\n")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=port)

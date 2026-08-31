@@ -105,8 +105,6 @@ class CustomIndexer:
         # Multiple TPB API mirrors for resilience (some get blocked per-region).
         tpb_hosts = [
             "https://apibay.org",
-            "https://apibay.unblockit.cam",
-            "https://apibay.org",
         ]
         try:
             for host in tpb_hosts:
@@ -135,18 +133,18 @@ class CustomIndexer:
             return []
 
     def search_torrentio(self, imdb_id: str, media_type: str = "movie", season: int = 0, episode: int = 0) -> list[dict]:
+        # Torrentio uses "series" (not "tv") as the media type in stream URLs.
+        # Using "tv" silently returns 0 streams for every show.
+        torrentio_type = "series" if media_type == "tv" else (media_type or "movie")
         # Multiple mirrors for resilience: some become unreachable from some
         # regions/datacenters, so try the next one before giving up.
         if media_type == "tv" and season and episode:
-            path = f"/stream/{media_type}/{imdb_id}:{season}:{episode}.json"
+            path = f"/stream/{torrentio_type}/{imdb_id}:{season}:{episode}.json"
         else:
-            path = f"/stream/{media_type}/{imdb_id}.json"
+            path = f"/stream/{torrentio_type}/{imdb_id}.json"
         hosts = [
             "https://torrentio.strem.fun",
             "https://torrentio.strem.fun",
-            "https://torrentio.biaky.workers.dev",
-            "https://torrentio.netsc.datasabbir.workers.dev",
-            "https://torrentio.run",
         ]
         for host in hosts:
             url = host + path
@@ -154,8 +152,15 @@ class CustomIndexer:
                 resp = self._fetch(url, tag="torrentio")
                 if not resp:
                     continue
+                try:
+                    data = resp.json()
+                except Exception as je:
+                    print(f"[indexer] torrentio {host} bad JSON: {je}; body[:200]={resp.text[:200]!r}", flush=True)
+                    continue
+                streams = data.get("streams", []) if isinstance(data, dict) else []
+                print(f"[indexer] torrentio {host} streams={len(streams)} keys={list(data.keys()) if isinstance(data, dict) else type(data).__name__}", flush=True)
                 results = []
-                for stream in resp.json().get("streams", []):
+                for stream in streams:
                     info_hash = stream.get("infoHash")
                     title_raw = stream.get("title", "")
                     if not info_hash:

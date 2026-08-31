@@ -192,7 +192,7 @@ async def download(payload: dict):
     m_ep = re.search(r'\bS(\d{1,2})\s*E(\d{1,3})\b', title, re.IGNORECASE)
     if m_ep:
         show_dir = _clean_title_for_folder(title) or (sanitize_path_input(title) or "Unknown")
-        season_dir = Path(dest) / show_dir / "Season " + str(int(m_ep.group(1)))
+        season_dir = Path(dest) / show_dir / ("Season " + str(int(m_ep.group(1))))
         episode_label = f"{show_dir} - S{int(m_ep.group(1)):02d}E{int(m_ep.group(2)):02d}"
         task_id = download_manager.start_download(magnet, dest, folder_name, size,
                                                   target_folder=str(season_dir),
@@ -222,7 +222,7 @@ async def download_season(payload: dict):
     # library series structure "<Show>/Season <n>/" so the library groups them
     # under the right show (movies vs series sections).
     show_dir = _clean_title_for_folder(title) or (sanitize_path_input(title) or "Unknown")
-    season_dir = Path(dest) / show_dir / "Season " + str(season)
+    season_dir = Path(dest) / show_dir / ("Season " + str(season))
     for ep in range(1, episode_count + 1):
         releases = indexer.search_all(imdb_id, title, "", title, "tv", season, ep)
         if not releases:

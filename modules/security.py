@@ -33,7 +33,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' https://m.media-amazon.com https://imdb.com data:; "
+            "img-src 'self' https://m.media-amazon.com https://imdb.com https://image.tmdb.org https://www.themoviedb.org data:; "
             "media-src 'self'; "
             "font-src 'self'; "
             "connect-src 'self';"

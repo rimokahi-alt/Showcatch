@@ -472,6 +472,7 @@ body {
 .float-downloads-body .downloads-list { padding-bottom: 0; }
 /* Offset page content so it is not hidden behind the fixed banner */
 body.has-downloads-banner { padding-top: 3.4rem; }
+body.has-downloads-banner.panel-collapsed { padding-top: 1.6rem; }
 
 /* ===== RTL panel ===== */
 [dir="rtl"] .float-downloads-header { flex-direction: row-reverse; }

@@ -386,7 +386,7 @@ function addDismissButton(card, taskId) {
 }
 
 // ===== Global Floating Downloads Panel =====
-let _floatCollapsed = localStorage.getItem("floatCollapsed") === "1";
+let _floatCollapsed = localStorage.getItem("floatCollapsed") !== "0";
 
 function updateFloatDownloads() {
     const panel = $("floatDownloads");
@@ -394,6 +394,7 @@ function updateFloatDownloads() {
     const empty = Object.keys(activeTasks).length === 0;
     panel.classList.toggle("hidden", empty);
     document.body.classList.toggle("has-downloads-banner", !empty);
+    document.body.classList.toggle("panel-collapsed", _floatCollapsed);
 }
 
 function toggleFloatDownloads(collapse) {
@@ -404,6 +405,7 @@ function toggleFloatDownloads(collapse) {
     localStorage.setItem("floatCollapsed", closed ? "1" : "0");
     if (body) body.classList.toggle("collapsed", closed);
     if (toggle) toggle.innerHTML = closed ? "&#9650;" : "&#9660;";
+    document.body.classList.toggle("panel-collapsed", closed);
 }
 
 document.addEventListener("click", (e) => {

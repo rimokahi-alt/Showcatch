@@ -27,7 +27,7 @@ from modules.security import (
 from modules.library import (
     add_to_history, get_history, clear_history, mark_downloaded,
     scan_downloaded_movies, get_poster_url, clean_history, attach_posters,
-    attach_genres,
+    attach_genres, fetch_poster_by_title,
 )
 from modules.transcoder import ensure_ffmpeg, build_transcode_cmd, detect_video_codec
 
@@ -482,6 +482,44 @@ def _tmdb_trending() -> list[dict]:
     return items
 
 
+# Built-in trendy titles used when no TMDB key is available (or still pending
+# activation) so the banner is never empty. imdb_id lets the poster be fetched
+# from iMDb's public API with no key.
+_TRENDING_FALLBACK = [
+    {"title": "Dune: Part Two", "year": "2024", "imdb_id": "tt15239678", "media_type": "movie"},
+    {"title": "Oppenheimer", "year": "2023", "imdb_id": "tt15398776", "media_type": "movie"},
+    {"title": "Interstellar", "year": "2014", "imdb_id": "tt0816692", "media_type": "movie"},
+    {"title": "Inception", "year": "2010", "imdb_id": "tt1375666", "media_type": "movie"},
+    {"title": "The Dark Knight", "year": "2008", "imdb_id": "tt0468569", "media_type": "movie"},
+    {"title": "Avatar: The Way of Water", "year": "2022", "imdb_id": "tt1630029", "media_type": "movie"},
+    {"title": "The Batman", "year": "2022", "imdb_id": "tt1877830", "media_type": "movie"},
+    {"title": "Spider-Man: Across the Spider-Verse", "year": "2023", "imdb_id": "tt9362722", "media_type": "movie"},
+    {"title": "John Wick: Chapter 4", "year": "2023", "imdb_id": "tt10366206", "media_type": "movie"},
+    {"title": "The Last of Us", "year": "2023", "imdb_id": "tt3581920", "media_type": "tv"},
+    {"title": "Stranger Things", "year": "2016", "imdb_id": "tt4574334", "media_type": "tv"},
+    {"title": "Game of Thrones", "year": "2011", "imdb_id": "tt0944947", "media_type": "tv"},
+    {"title": "Breaking Bad", "year": "2008", "imdb_id": "tt0903747", "media_type": "tv"},
+    {"title": "The Witcher", "year": "2019", "imdb_id": "tt5180504", "media_type": "tv"},
+    {"title": "Wednesday", "year": "2022", "imdb_id": "tt13443470", "media_type": "tv"},
+]
+
+
+def _trending_fallback() -> list[dict]:
+    items = []
+    for t in _TRENDING_FALLBACK:
+        poster = get_poster_url(t["imdb_id"]) or fetch_poster_by_title(t["title"], t["year"])
+        items.append({
+            "title": t["title"],
+            "year": t["year"],
+            "imdb_id": t["imdb_id"],
+            "poster": poster,
+            "media_type": t["media_type"],
+            "downloaded": False,
+            "kind": "discovery",
+        })
+    return items
+
+
 @app.get("/api/featured")
 async def get_featured():
     """Featured banner items: local library (downloaded, playable) first, then
@@ -534,8 +572,10 @@ async def get_featured():
         })
 
     # Always offer trending titles so the banner is never empty, even on a
-    # fresh instance with no library and no search history yet.
-    for tr in _tmdb_trending():
+    # fresh instance with no library and no search history yet. Prefer live
+    # TMDB trending; fall back to the built-in list while no key is set.
+    trending = _tmdb_trending() or _trending_fallback()
+    for tr in trending:
         imdb = tr.get("imdb_id", "")
         if imdb and imdb in seen:
             continue

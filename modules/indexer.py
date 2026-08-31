@@ -292,6 +292,10 @@ class CustomIndexer:
                 filtered.append(r)
 
         filtered.sort(key=lambda x: x["seeders"], reverse=True)
+        # Cap the result list: hundreds of streams (Torrentio can return 500+
+        # for a whole season) blow up the JSON payload and make the browser
+        # time out with a "Network error". Show the best seeders only.
+        filtered = filtered[:40]
 
         # Graceful fallback: if strict matching dropped everything but we did
         # receive releases, return a de-duplicated top list so the user is never

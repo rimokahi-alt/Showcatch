@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import threading
 import zipfile
+import platform
 from pathlib import Path
 import requests
 
@@ -31,6 +32,13 @@ def ensure_ffmpeg() -> str:
     path = get_ffmpeg_path()
     if path and get_ffprobe_path():
         return path
+
+    # Linux/Render: do NOT plant Windows binaries here — rely on the system
+    # ffmpeg/ffprobe (install via apt, see apt.txt). Without it, transcoding is
+    # paused and the library skips non-playable files (safe, no crash).
+    if platform.system() != "Windows":
+        print("[ffmpeg] system ffmpeg/ffprobe missing — install via apt (add 'ffmpeg' to apt.txt)", flush=True)
+        return ""
 
     FFMPEG_DIR.mkdir(parents=True, exist_ok=True)
     zip_path = FFMPEG_DIR / "ffmpeg.zip"

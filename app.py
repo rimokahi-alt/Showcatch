@@ -6,7 +6,10 @@ import asyncio
 import subprocess
 import threading
 import secrets
+import time
 from pathlib import Path
+
+import requests
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -439,6 +442,46 @@ async def get_library():
     return {"downloaded": movies, "series": series, "history": history}
 
 
+# ===== TMDB Trending (banner "most watched / trending") =====
+# Reads a free API key from the TMDB_API_KEY env var. Without a key it returns
+# an empty list and the banner falls back to the library/history defaults.
+_TMDB_IMG = "https://image.tmdb.org/t/p/w780"
+_trending_cache: dict = {"at": 0.0, "items": []}
+
+
+def _tmdb_trending() -> list[dict]:
+    key = os.environ.get("TMDB_API_KEY", "").strip()
+    if not key or time.time() - _trending_cache["at"] < 3600:
+        return _trending_cache["items"]
+    items: list[dict] = []
+    try:
+        ses = requests.Session()
+        for media_type in ("movie", "tv"):
+            url = f"https://api.themoviedb.org/3/trending/{media_type}/day"
+            r = ses.get(url, params={"api_key": key, "language": "en-US"},
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+            if r.status_code != 200:
+                continue
+            for it in r.json().get("results", [])[:10]:
+                title = it.get("title") or it.get("name") or ""
+                imdb = it.get("imdb_id") or ""
+                poster = it.get("poster_path") or it.get("backdrop_path") or ""
+                items.append({
+                    "title": title,
+                    "year": (it.get("release_date") or it.get("first_air_date") or "")[:4],
+                    "imdb_id": imdb,
+                    "poster": (_TMDB_IMG + poster) if poster else "",
+                    "media_type": "tv" if media_type == "tv" else "movie",
+                    "downloaded": False,
+                    "kind": "discovery",
+                })
+    except Exception:
+        pass
+    _trending_cache["at"] = time.time()
+    _trending_cache["items"] = items
+    return items
+
+
 @app.get("/api/featured")
 async def get_featured():
     """Featured banner items: local library (downloaded, playable) first, then
@@ -489,6 +532,17 @@ async def get_featured():
             "downloaded": False,
             "kind": "discovery",
         })
+
+    # Always offer trending titles so the banner is never empty, even on a
+    # fresh instance with no library and no search history yet.
+    for tr in _tmdb_trending():
+        imdb = tr.get("imdb_id", "")
+        if imdb and imdb in seen:
+            continue
+        if imdb:
+            seen.add(imdb)
+        featured.append(tr)
+
     return {"featured": featured}
 
 

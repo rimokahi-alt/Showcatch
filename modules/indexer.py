@@ -65,16 +65,17 @@ class CustomIndexer:
                 self._cache.clear()
             self._cache[key] = (time.time(), data)
 
-    def _fetch(self, url: str, timeout: int = 6, tries: int = 2) -> requests.Response | None:
+    def _fetch(self, url: str, timeout: int = 6, tries: int = 2, tag: str = "") -> requests.Response | None:
         connect_timeout = max(3.0, timeout - 3)
         timeout_tuple = (connect_timeout, timeout)
         for attempt in range(tries):
             try:
                 resp = requests.get(url, headers=self.headers, timeout=timeout_tuple)
+                print(f"[indexer] {tag or url} -> HTTP {resp.status_code}", flush=True)
                 if resp.status_code == 200:
                     return resp
-            except requests.RequestException:
-                pass
+            except requests.RequestException as e:
+                print(f"[indexer] {tag or url} error: {type(e).__name__}: {e}", flush=True)
             if attempt < tries - 1:
                 time.sleep(0.5 * (attempt + 1))
         return None
@@ -101,65 +102,90 @@ class CustomIndexer:
             term = title
         else:
             term = f"{title} {year}".strip()
+        # Multiple TPB API mirrors for resilience (some get blocked per-region).
+        tpb_hosts = [
+            "https://apibay.org",
+            "https://apibay.unblockit.cam",
+            "https://apibay.org",
+        ]
         try:
-            resp = self._fetch(f"https://apibay.org/q.php?q={quote_plus(term)}")
-            if not resp:
-                return []
-            results = []
-            for t in resp.json():
-                name = t.get("name", "")
-                info_hash = t.get("info_hash", "")
-                seeders = int(t.get("seeders", 0))
-                size_bytes = int(t.get("size", 0))
-                if not info_hash or info_hash == "0" * 40 or seeders <= 0:
+            for host in tpb_hosts:
+                resp = self._fetch(f"{host}/q.php?q={quote_plus(term)}", tag="apibay")
+                if not resp:
                     continue
-                size_gb = size_bytes / (1024 ** 3)
-                if size_gb > 14.0:
-                    continue
-                if self._is_valid_quality(name):
-                    results.append({"title": name, "seeders": seeders, "size": f"{size_gb:.2f} GB", "indexer": "ThePirateBay", "magnet": build_magnet(info_hash, name)})
-            return results
-        except Exception:
+                results = []
+                for t in resp.json():
+                    name = t.get("name", "")
+                    info_hash = t.get("info_hash", "")
+                    seeders = int(t.get("seeders", 0))
+                    size_bytes = int(t.get("size", 0))
+                    if not info_hash or info_hash == "0" * 40 or seeders <= 0:
+                        continue
+                    size_gb = size_bytes / (1024 ** 3)
+                    if size_gb > 14.0:
+                        continue
+                    if self._is_valid_quality(name):
+                        results.append({"title": name, "seeders": seeders, "size": f"{size_gb:.2f} GB", "indexer": "ThePirateBay", "magnet": build_magnet(info_hash, name)})
+                if results:
+                    return results
+            print(f"[indexer] apibay returned nothing for '{term}'", flush=True)
+            return []
+        except Exception as e:
+            print(f"[indexer] apibay error: {type(e).__name__}: {e}", flush=True)
             return []
 
     def search_torrentio(self, imdb_id: str, media_type: str = "movie", season: int = 0, episode: int = 0) -> list[dict]:
+        # Multiple mirrors for resilience: some become unreachable from some
+        # regions/datacenters, so try the next one before giving up.
         if media_type == "tv" and season and episode:
-            url = f"https://torrentio.strem.fun/stream/{media_type}/{imdb_id}:{season}:{episode}.json"
+            path = f"/stream/{media_type}/{imdb_id}:{season}:{episode}.json"
         else:
-            url = f"https://torrentio.strem.fun/stream/{media_type}/{imdb_id}.json"
-        try:
-            resp = self._fetch(url)
-            if not resp:
-                return []
-            results = []
-            for stream in resp.json().get("streams", []):
-                info_hash = stream.get("infoHash")
-                title_raw = stream.get("title", "")
-                if not info_hash:
+            path = f"/stream/{media_type}/{imdb_id}.json"
+        hosts = [
+            "https://torrentio.strem.fun",
+            "https://torrentio.strem.fun",
+            "https://torrentio.biaky.workers.dev",
+            "https://torrentio.netsc.datasabbir.workers.dev",
+            "https://torrentio.run",
+        ]
+        for host in hosts:
+            url = host + path
+            try:
+                resp = self._fetch(url, tag="torrentio")
+                if not resp:
                     continue
-                lines = title_raw.split("\n")
-                release_name = lines[0] if lines else "Unknown"
-                seeders = 0
-                size_str = "Unknown"
-                indexer = "Torrentio"
-                if len(lines) > 1:
-                    details = lines[1]
-                    sm = re.search(r'(\d+)', details)
-                    if sm:
-                        seeders = int(sm.group(1))
-                    zm = re.search(r'([\d\.]+\s*[MGT]B)', details, re.I)
-                    if zm:
-                        size_str = zm.group(1)
-                    im = re.search(r'⚙️\s*([^\n]+)', details)
-                    if im:
-                        indexer = im.group(1).strip()
-                if seeders <= 0:
-                    continue
-                if self._is_valid_quality(release_name):
-                    results.append({"title": release_name, "seeders": seeders, "size": size_str, "indexer": indexer, "magnet": build_magnet(info_hash, release_name)})
-            return results
-        except Exception:
-            return []
+                results = []
+                for stream in resp.json().get("streams", []):
+                    info_hash = stream.get("infoHash")
+                    title_raw = stream.get("title", "")
+                    if not info_hash:
+                        continue
+                    lines = title_raw.split("\n")
+                    release_name = lines[0] if lines else "Unknown"
+                    seeders = 0
+                    size_str = "Unknown"
+                    indexer = "Torrentio"
+                    if len(lines) > 1:
+                        details = lines[1]
+                        sm = re.search(r'(\d+)', details)
+                        if sm:
+                            seeders = int(sm.group(1))
+                        zm = re.search(r'([\d\.]+\s*[MGT]B)', details, re.I)
+                        if zm:
+                            size_str = zm.group(1)
+                        im = re.search(r'⚙️\s*([^\n]+)', details)
+                        if im:
+                            indexer = im.group(1).strip()
+                    if seeders <= 0:
+                        continue
+                    if self._is_valid_quality(release_name):
+                        results.append({"title": release_name, "seeders": seeders, "size": size_str, "indexer": indexer, "magnet": build_magnet(info_hash, release_name)})
+                if results:
+                    return results
+            except Exception as e:
+                print(f"[indexer] torrentio {host} failed: {type(e).__name__}: {e}", flush=True)
+                continue
+        return []
 
     def search_yts(self, imdb_id: str) -> list[dict]:
         try:
@@ -230,8 +256,10 @@ class CustomIndexer:
             for fut in as_completed(futures):
                 try:
                     releases.extend(fut.result())
-                except Exception:
+                except Exception as e:
+                    print(f"[indexer] {fut} failed: {type(e).__name__}: {e}", flush=True)
                     continue
+        print(f"[indexer] search_all({media_type} s={season} e={episode}) raw releases={len(releases)}", flush=True)
 
         # Build a forgiving match pattern. Torrentio already filters by the
         # exact episode when season/episode are given, so we must NOT re-filter
